@@ -1,0 +1,93 @@
+{
+    // Use IntelliSense to find out which attributes exist for C# debugging
+    // Use hover for the description of the existing attributes
+    // For further information visit https://github.com/OmniSharp/omnisharp-vscode/blob/master/debugger-launchjson.md
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Publish, Launch, and Attach Debugger",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "publish",
+            "program": "~/dotnet/${workspaceFolderBasename}/${workspaceFolderBasename}",
+            "cwd": "~/dotnet/${workspaceFolderBasename}",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "linux": {
+                "pipeTransport": {
+                    "pipeCwd": "${workspaceRoot}",
+                    "pipeProgram": "/usr/bin/ssh",
+                    "pipeArgs": [
+                        "pi@rpisense.local"
+                    ],
+                    "debuggerPath": "~/vsdbg/vsdbg"
+                }
+            },
+            "osx": {
+                "pipeTransport": {
+                    "pipeCwd": "${workspaceRoot}",
+                    "pipeProgram": "/usr/bin/ssh",
+                    "pipeArgs": [
+                        "pi@rpisense.local"
+                    ],
+                    "debuggerPath": "~/vsdbg/vsdbg"
+                }
+            },
+            "windows": {
+                "pipeTransport": {
+                    "pipeCwd": "${workspaceRoot}",
+                    "pipeProgram": "plink",
+                    "pipeArgs": [
+                        "-ssh",
+                        "-pw",
+                        "raspberry",
+                        "pi@192.168.0.150"
+                    ],
+                    "debuggerPath": "~/vsdbg/vsdbg"
+                }
+            },
+        },
+        {
+            "name": "Run .NET Core and Remote Launch",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "~/dotnet/${workspaceFolderBasename}/${workspaceFolderBasename}",
+            "cwd": "~/dotnet/${workspaceFolderBasename}",
+            "stopAtEntry": false,
+            "console": "internalConsole",
+            "linux": {
+                "pipeTransport": {
+                    "pipeCwd": "${workspaceRoot}",
+                    "pipeProgram": "/usr/bin/ssh",
+                    "pipeArgs": [
+                        "pi@pisense.local"
+                    ],
+                    "debuggerPath": "~/vsdbg/vsdbg"
+                }
+            },
+            "osx": {
+                "pipeTransport": {
+                    "pipeCwd": "${workspaceRoot}",
+                    "pipeProgram": "/usr/bin/ssh",
+                    "pipeArgs": [
+                        "pi@pisense.local"
+                    ],
+                    "debuggerPath": "~/vsdbg/vsdbg"
+                }
+            },
+            "windows": {
+                "pipeTransport": {
+                    "pipeCwd": "${workspaceRoot}",
+                    "pipeProgram": "plink",
+                    "pipeArgs": [
+                        "-ssh",
+                        "-pw",
+                        "raspberry",
+                        "pi@192.168.0.150"
+                    ],
+                    "debuggerPath": "~/vsdbg/vsdbg"
+                }
+            }
+        }
+    ]
+}
