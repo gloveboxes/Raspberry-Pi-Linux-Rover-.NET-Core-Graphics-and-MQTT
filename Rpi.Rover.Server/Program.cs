@@ -12,6 +12,9 @@ using Glovebox.Graphics.Drivers;
 using Glovebox.Graphics.LedType;
 using Glovebox.Graphics.Font;
 using System.Drawing;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Configuration;
+using System.Threading.Tasks;
 
 
 namespace Rpi.listen
@@ -65,12 +68,44 @@ namespace Rpi.listen
         static Ht16K33BiColor driver = new Ht16K33BiColor(new byte[] { 0x71 });
         static LED8x8Matrix matrix = new LED8x8Matrix(driver, Fonts.CP437);
 
+        private static readonly string userId = $"User {new Random().Next(1, 99)}";
+        private static ServiceUtils serviceUtils;
+        private static readonly string hubName = "Rover";
+        private static HubConnection hubConnection;
 
-        static void Main(string[] args)
+
+        static async Task  Main(string[] args)
         {
             matrix.Brightness = 1;
             matrix.Blink = LedDriver.BlinkRate.Slow;
             driver.Write(new ulong[] { 0 }, new ulong[] { (ulong)Symbols.Heart });
+
+            var configuration = new ConfigurationBuilder()
+               .SetBasePath(Directory.GetCurrentDirectory())
+               .AddUserSecrets<Program>()
+               .Build();
+
+            serviceUtils = new ServiceUtils(configuration["Azure:SignalR:ConnectionString"]);
+
+            var url = $"{serviceUtils.Endpoint}:5001/client/?hub={hubName}";
+
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(url, option =>
+                {
+                    option.AccessTokenProvider = () =>
+                    {
+                        return Task.FromResult(serviceUtils.GenerateAccessToken(url, userId));
+                    };
+                }).Build();
+
+            hubConnection.On<string, string>("SendMessage",
+                (string server, string message) =>
+                {
+                    Console.WriteLine($"Message from server {server}: {message}");
+                    roverActions(message);
+                });
+            
+            await hubConnection.StartAsync();
 
             try
             {

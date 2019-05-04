@@ -1,0 +1,1 @@
+dotnet user-secrets set  'Azure:SignalR:ConnectionString' '676767676767'
