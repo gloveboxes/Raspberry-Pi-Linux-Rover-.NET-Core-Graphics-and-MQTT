@@ -17,16 +17,16 @@ using Microsoft.Extensions.Configuration;
 using System.Threading.Tasks;
 
 
-namespace Rpi.listen
+namespace Rpi.Rover
 {
     class Program
     {
         enum MotorMap : byte
         {
-            TwoPlus = 21,
-            TwoMinus = 26,
-            OnePlus = 19,
-            OneMinus = 20
+            TwoPlus = 26,
+            TwoMinus = 21,
+            OnePlus = 20,
+            OneMinus = 19
         }
 
         enum MotorControl
@@ -73,13 +73,53 @@ namespace Rpi.listen
         private static readonly string hubName = "Rover";
         private static HubConnection hubConnection;
 
+        private static int lastTickCount = Environment.TickCount & Int32.MaxValue;
 
-        static async Task  Main(string[] args)
+
+        static async Task Main(string[] args)
         {
             matrix.Brightness = 1;
             matrix.Blink = LedDriver.BlinkRate.Slow;
             driver.Write(new ulong[] { 0 }, new ulong[] { (ulong)Symbols.Heart });
 
+            // set up listener on SignalR
+            try
+            {
+                SetUpSignalr();
+
+                hubConnection.On<string, string>("SendMessage",
+                    (string server, string message) =>
+                    {
+                        Console.WriteLine($"Message from server {server}: {message}");
+                        RoverActions(message);
+                    });
+
+                await hubConnection.StartAsync();
+            }
+            catch
+            {
+                Console.WriteLine("Failed to set up Azure SignalR client");
+            }
+
+            // set up listener on MQTT
+            try
+            {
+                client.MqttMsgPublishReceived += MqttMsgPublishReceived;
+                string clientId = Guid.NewGuid().ToString();
+                client.Connect(clientId);
+                client.Subscribe(new string[] { "/rover/motor" }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
+            }
+            catch
+            {
+                Console.WriteLine("Check Mosquitto installed on Raspberry Pi. sudo apt install mosquitto");
+            }
+
+            // set up listener on local socket 5050
+            tcp.Listen(RoverActions);
+        }
+
+        static void SetUpSignalr()
+        {
             var configuration = new ConfigurationBuilder()
                .SetBasePath(Directory.GetCurrentDirectory())
                .AddUserSecrets<Program>()
@@ -97,40 +137,26 @@ namespace Rpi.listen
                         return Task.FromResult(serviceUtils.GenerateAccessToken(url, userId));
                     };
                 }).Build();
-
-            hubConnection.On<string, string>("SendMessage",
-                (string server, string message) =>
-                {
-                    Console.WriteLine($"Message from server {server}: {message}");
-                    roverActions(message);
-                });
-            
-            await hubConnection.StartAsync();
-
-            try
-            {
-                client.MqttMsgPublishReceived += client_MqttMsgPublishReceived;
-                string clientId = Guid.NewGuid().ToString();
-                client.Connect(clientId);
-                client.Subscribe(new string[] { "/rover/motor" }, new byte[] { MqttMsgBase.QOS_LEVEL_EXACTLY_ONCE });
-            }
-            catch
-            {
-                Console.WriteLine("Check Mosquitto installed on Raspberry Pi. sudo apt install mosquitto");
-            }
-
-            tcp.Listen(roverActions);
         }
 
-        static void client_MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
+        static void MqttMsgPublishReceived(object sender, MqttMsgPublishEventArgs e)
         {
             string action = Encoding.UTF8.GetString(e.Message, 0, e.Message.Length);
-            roverActions(action);
+            RoverActions(action);
         }
 
-        static void roverActions(string action)
+        static void RoverActions(string action)
         {
             int cmd;
+            int currentTickCount = Environment.TickCount & Int32.MaxValue;
+
+            //provide some protection against flooding of messages - Throws away messages received less than 250ms since last msg
+            if (Math.Abs(lastTickCount - Environment.TickCount & Int32.MaxValue) < 250)
+            {
+                return;
+            }
+
+            lastTickCount = currentTickCount;
 
             matrix.Blink = LedDriver.BlinkRate.Off;
 
